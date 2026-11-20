@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Runtime data
+data/live/
+data/history/
+data/outbox/
+data/*.db
+data/*.db-*
+data/dashboard_cache.json
+data/*.tmp
+logs/
+
+# Model artifacts: the small trained checkpoint (≈650 KB) is tracked so a
+# fresh clone or hosted deploy can run inference immediately. Keep only
+# ad-hoc/oversized checkpoints out of the repository.
+models/*.pth
+models/*.ckpt
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

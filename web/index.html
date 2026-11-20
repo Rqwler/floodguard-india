@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FloodGuard India — live AI flood detection and early warning for five flood-prone Indian river basins.">
+  <meta name="theme-color" content="#07111f">
+  <title>FloodGuard India · AI flood early warning</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/vendor/chart.umd.min.js" defer></script>
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="grid-overlay" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="FloodGuard India home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path d="M8 29c5.2 0 5.2-5 10.4-5s5.2 5 10.4 5 5.2-5 10.4-5 5.2 5 5.2 5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M8 37c5.2 0 5.2-5 10.4-5s5.2 5 10.4 5 5.2-5 10.4-5 5.2 5 5.2 5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity=".6"/>
+          <path d="M24 7c0 5-7 7.4-7 13a7 7 0 1 0 14 0c0-5.6-7-8-7-13Z" fill="currentColor" opacity=".22"/>
+        </svg>
+      </span>
+      <span class="brand-copy">
+        <strong>FloodGuard<span> India</span></strong>
+        <small>AI flood intelligence</small>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#overview">Overview</a>
+      <a href="#basins">Basins</a>
+      <a href="#detail">River watch</a>
+      <a href="#alerts">Alerts</a>
+      <a href="#model">Model</a>
+    </nav>
+
+    <div class="top-actions">
+      <span id="dataStatus" class="status-chip loading" title="Live data source status">
+        <span class="status-dot"></span>
+        <span id="dataStatusText">Connecting</span>
+      </span>
+      <span class="clock" id="clock">--:-- IST</span>
+      <button class="icon-button" id="refreshBtn" type="button" title="Refresh live data now" aria-label="Refresh live data">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20 11a8 8 0 1 0-2.34 5.66" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M20 5v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="offlineBanner" class="banner hidden" role="status"></div>
+
+  <main class="page">
+    <section class="hero" id="overview">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-pulse"></span> National flood intelligence · India</div>
+        <h1>India's flood pulse,<br><span>in one live view.</span></h1>
+        <p class="hero-lede">
+          Five of India's most flood-exposed river corridors, watched with live river discharge,
+          rainfall and soil moisture. A region-aware BiLSTM spots abnormal water levels and
+          gives each basin an eight-day outlook.
+        </p>
+        <div class="hero-meta">
+          <span><span class="mini-label">Last sync</span> <b id="lastUpdated">Waiting for first sync…</b></span>
+          <span><span class="mini-label">Cadence</span> <b id="refreshCadence">Every 30 min</b></span>
+          <span><span class="mini-label">Source</span> <b>Open-Meteo · GloFAS</b></span>
+        </div>
+      </div>
+
+      <aside class="hero-gauge panel">
+        <div class="panel-kicker">National flood signal</div>
+        <div class="gauge-layout">
+          <div class="gauge-ring" id="nationalRing" style="--pct: 0; --ring-color: #2dd4bf;">
+            <div class="gauge-inner">
+              <span id="nationalScore">--</span>
+              <small>risk / 100</small>
+            </div>
+          </div>
+          <div class="gauge-copy">
+            <span class="risk-pill" id="nationalPill" style="--risk-color:#2dd4bf;--risk-bg:rgba(45,212,191,.12)">Calibrating</span>
+            <p id="nationalSummary">Loading live river conditions…</p>
+            <div class="gauge-foot">
+              <span>Peak basin</span>
+              <strong id="nationalPeak">—</strong>
+            </div>
+          </div>
+        </div>
+        <div class="gauge-scale" aria-hidden="true">
+          <span class="scale-normal">Normal</span>
+          <span class="scale-watch">Watch</span>
+          <span class="scale-warning">Warning</span>
+          <span class="scale-severe">Severe</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="stats-grid" aria-label="National snapshot">
+      <article class="stat-card">
+        <span class="stat-label">Basins monitored</span>
+        <strong class="stat-value" id="statBasins">—</strong>
+        <span class="stat-sub" id="statBasinsSub">Assam · Bihar · Kerala · Mumbai · West Bengal</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Active warnings</span>
+        <strong class="stat-value" id="statWarnings">—</strong>
+        <span class="stat-sub" id="statWarningsSub">Warning + Severe</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Peak risk score</span>
+        <strong class="stat-value" id="statPeak">—</strong>
+        <span class="stat-sub" id="statPeakSub">Across the active horizon</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Alert subscribers</span>
+        <strong class="stat-value" id="statSubscribers">—</strong>
+        <span class="stat-sub" id="statSubscribersSub">Email early-warning list</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Model macro-F1</span>
+        <strong class="stat-value" id="statF1">—</strong>
+        <span class="stat-sub" id="statF1Sub">Chronological hold-out</span>
+      </article>
+    </section>
+
+    <section class="section" id="basins">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Live basin board</div>
+          <h2>Where the water is now</h2>
+          <p>Observed river state, 24-hour model outlook and the three warning thresholds for each basin.</p>
+        </div>
+        <div class="section-side">
+          <span class="legend-dot"><i style="background:#2dd4bf"></i>Normal</span>
+          <span class="legend-dot"><i style="background:#fbbf24"></i>Watch</span>
+          <span class="legend-dot"><i style="background:#fb923c"></i>Warning</span>
+          <span class="legend-dot"><i style="background:#fb7185"></i>Severe</span>
+        </div>
+      </div>
+      <div class="region-grid" id="regionCards">
+        <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      </div>
+    </section>
+
+    <section class="section grid-two forecast-section">
+      <div class="panel chart-panel large">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Eight-day outlook</div>
+            <h3>Basin risk trajectory</h3>
+            <p>Ensemble score from the BiLSTM and the GloFAS hydrological guardrail.</p>
+          </div>
+          <span class="chart-note" id="forecastRange">—</span>
+        </div>
+        <div class="chart-wrap tall">
+          <canvas id="riskForecastChart" aria-label="Eight day flood risk forecast for five Indian river basins"></canvas>
+        </div>
+      </div>
+      <aside class="panel risk-scale-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Reading the scale</div>
+            <h3>Risk levels</h3>
+          </div>
+        </div>
+        <div class="risk-scale-list">
+          <div class="risk-scale-item normal">
+            <span class="scale-score">0–39</span>
+            <div><strong>Normal</strong><p>Discharge is within the basin's usual operating range.</p></div>
+          </div>
+          <div class="risk-scale-item watch">
+            <span class="scale-score">40–64</span>
+            <div><strong>Watch</strong><p>Rising water or saturated catchments; keep monitoring.</p></div>
+          </div>
+          <div class="risk-scale-item warning">
+            <span class="scale-score">65–84</span>
+            <div><strong>Warning</strong><p>Abnormal levels are likely. Subscribers receive email.</p></div>
+          </div>
+          <div class="risk-scale-item severe">
+            <span class="scale-score">85–100</span>
+            <div><strong>Severe</strong><p>High-impact flooding is possible. Act on official guidance.</p></div>
+          </div>
+        </div>
+        <div class="threshold-callout">
+          <div class="threshold-icon">!</div>
+          <p>Alerts fire at <strong id="alertThresholdLabel">Warning</strong> within a <strong id="alertHorizonLabel">3-day</strong> horizon.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" id="detail">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">River watch</div>
+          <h2>One basin, in detail</h2>
+          <p>Rainfall, discharge, thresholds and the model's eight-day risk path. Select a basin to inspect it.</p>
+        </div>
+        <span class="ensemble-chip" id="ensembleChip">BiLSTM ensemble</span>
+      </div>
+
+      <div class="panel detail-panel">
+        <div class="region-tabs" id="regionTabs" role="tablist" aria-label="Select a river basin"></div>
+
+        <div class="detail-head">
+          <div>
+            <div class="detail-kicker" id="detailKicker">—</div>
+            <h3 id="detailTitle">Loading basin…</h3>
+            <p id="detailDescription">Fetching live river conditions.</p>
+          </div>
+          <div class="detail-badge-wrap" id="detailBadge"></div>
+        </div>
+
+        <div class="detail-stats" id="detailStats"></div>
+
+        <div class="chart-grid">
+          <div class="chart-panel inner">
+            <div class="panel-head compact">
+              <div>
+                <div class="panel-kicker">Hydrograph · 60 days + outlook</div>
+                <h3>Rainfall &amp; river discharge</h3>
+              </div>
+              <span class="chart-note">mm / m³/s</span>
+            </div>
+            <div class="chart-wrap medium">
+              <canvas id="basinChart" aria-label="Rainfall and river discharge chart"></canvas>
+            </div>
+          </div>
+          <div class="chart-panel inner">
+            <div class="panel-head compact">
+              <div>
+                <div class="panel-kicker">Model path · 60 days + outlook</div>
+                <h3>Flood risk timeline</h3>
+              </div>
+              <span class="chart-note">0–100</span>
+            </div>
+            <div class="chart-wrap medium">
+              <canvas id="basinRiskChart" aria-label="Flood risk timeline chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-lower">
+          <div class="panel inner forecast-table-panel">
+            <div class="panel-head compact">
+              <div>
+                <div class="panel-kicker">Next eight days</div>
+                <h3>Forecast detail</h3>
+              </div>
+              <span class="chart-note">Ensemble outlook</span>
+            </div>
+            <div class="table-wrap">
+              <table class="forecast-table">
+                <thead>
+                  <tr><th>Date</th><th>Rain</th><th>Discharge</th><th>AI signal</th><th>Risk</th></tr>
+                </thead>
+                <tbody id="forecastTableBody">
+                  <tr><td colspan="5" class="empty-cell">Loading forecast…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="panel inner">
+              <div class="panel-head compact">
+                <div>
+                  <div class="panel-kicker">24-hour distribution</div>
+                  <h3>Signal composition</h3>
+                </div>
+              </div>
+              <div class="probability-bars" id="probabilityBars"></div>
+              <div class="ensemble-note" id="ensembleNote">LSTM probabilities blended with the discharge prior.</div>
+            </div>
+            <div class="panel inner">
+              <div class="panel-head compact">
+                <div>
+                  <div class="panel-kicker">Physical signals</div>
+                  <h3>Key drivers</h3>
+                </div>
+              </div>
+              <div class="driver-list" id="drivers"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="alerts">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Early warning by email</div>
+          <h2>Get told before the water arrives</h2>
+          <p>Choose the basins you care about. When the ensemble reaches Warning or Severe, an email is dispatched automatically.</p>
+        </div>
+        <span class="status-chip subtle" id="emailModeChip"><span class="status-dot"></span><span id="emailModeText">Checking delivery</span></span>
+      </div>
+
+      <div class="alerts-grid">
+        <div class="panel signup-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Alert subscription</div>
+              <h3>Add your inbox</h3>
+            </div>
+            <span class="tiny-badge">Free</span>
+          </div>
+          <form id="alertForm" novalidate>
+            <label class="field-label" for="alertEmail">Email address</label>
+            <div class="input-row">
+              <input id="alertEmail" name="email" type="email" placeholder="you@example.com" autocomplete="email" required>
+              <button class="primary-button" type="submit" id="subscribeBtn">Subscribe</button>
+            </div>
+            <fieldset class="region-fieldset">
+              <legend>Basins to watch</legend>
+              <div class="check-grid" id="regionChecks"></div>
+            </fieldset>
+            <p class="form-note">No account needed. You can unsubscribe from every email. Alerts use the same live model as this dashboard.</p>
+            <div class="form-status" id="subscribeStatus" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+
+        <div class="panel pipeline-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Alert pipeline</div>
+              <h3>How delivery is configured</h3>
+            </div>
+          </div>
+          <div class="pipeline-rows" id="pipelineRows">
+            <div><span>Trigger level</span><strong>Warning</strong></div>
+            <div><span>Forecast horizon</span><strong>3 days</strong></div>
+            <div><span>Cooldown</span><strong>12 hours</strong></div>
+            <div><span>Delivery mode</span><strong id="pipelineMode">Checking…</strong></div>
+          </div>
+          <div class="pipeline-note" id="pipelineNote">
+            Configure SMTP credentials in <code>.env</code> to send live email. In simulation mode every message is saved to <code>data/outbox</code>.
+          </div>
+          <div class="test-controls">
+            <label class="field-label" for="testEmail">Pipeline test</label>
+            <input id="testEmail" type="email" placeholder="you@example.com" autocomplete="email">
+            <div class="button-row">
+              <button class="ghost-button" type="button" id="testEmailBtn">Send test email</button>
+              <button class="ghost-button demo" type="button" id="demoAlertBtn">Send demo warning</button>
+            </div>
+            <div class="form-status" id="testStatus" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel alerts-log-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Alert activity</div>
+            <h3>Recent dispatches</h3>
+          </div>
+          <span class="chart-note" id="alertLogCount">0 entries</span>
+        </div>
+        <div class="alert-log" id="alertLog">
+          <div class="empty-state">
+            <div class="empty-icon">◎</div>
+            <strong>No alerts dispatched yet</strong>
+            <p>When a basin reaches Warning, the delivery log appears here. Use the demo button above to preview the full path.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="model">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Model card</div>
+          <h2>The model behind the warning</h2>
+          <p>A region-aware bidirectional LSTM learns how rainfall, soil saturation and discharge evolve into flood risk.</p>
+        </div>
+        <span class="ensemble-chip" id="modelStatusChip">Loading model</span>
+      </div>
+
+      <div class="model-grid">
+        <div class="panel model-card-panel">
+          <div class="model-architecture" id="modelArchitecture">
+            <div class="architecture-icon">
+              <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <circle cx="8" cy="24" r="3.4" fill="currentColor"/><circle cx="18" cy="14" r="3.4" fill="currentColor" opacity=".7"/>
+                <circle cx="18" cy="34" r="3.4" fill="currentColor" opacity=".7"/><circle cx="30" cy="18" r="3.4" fill="currentColor" opacity=".5"/>
+                <circle cx="30" cy="30" r="3.4" fill="currentColor" opacity=".5"/><circle cx="41" cy="24" r="3.4" fill="currentColor"/>
+                <path d="M11 22l4-5m-4 9 4 5m3-13 5 3m-5 9 5-3m3-5 5 3m-5-3 5-3" stroke="currentColor" stroke-width="1.4" opacity=".5"/>
+              </svg>
+            </div>
+            <div>
+              <h3 id="architectureTitle">BiLSTM · temporal attention</h3>
+              <p id="architectureText">Two-layer bidirectional LSTM with a learned basin embedding and additive attention pooling.</p>
+            </div>
+          </div>
+          <div class="model-meta" id="modelMeta"></div>
+          <div class="model-metrics" id="modelMetrics"></div>
+          <div class="confusion-wrap">
+            <div class="panel-head compact">
+              <div><div class="panel-kicker">Hold-out test</div><h3>Confusion matrix</h3></div>
+            </div>
+            <div id="confusionMatrix"></div>
+          </div>
+        </div>
+
+        <div class="panel training-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Optimisation trace</div>
+              <h3>Training &amp; validation loss</h3>
+            </div>
+            <span class="chart-note" id="modelEpochNote">—</span>
+          </div>
+          <div class="chart-wrap medium">
+            <canvas id="trainingChart" aria-label="Training and validation loss curve"></canvas>
+          </div>
+          <div class="feature-block">
+            <div class="panel-kicker">Input window · 14 days × 19 features</div>
+            <div class="feature-chips" id="featureChips"></div>
+          </div>
+          <div class="model-note" id="modelNote">
+            Labels are derived from basin-specific discharge quantiles. Test data is strictly later in time than training data.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section credits">
+      <div>
+        <div class="section-kicker">Data &amp; disclaimer</div>
+        <h2>Built for exploration, not evacuation decisions.</h2>
+        <p>
+          FloodGuard India combines Open-Meteo's GloFAS river-discharge forecasts and ERA5-Land
+          historical weather with a locally trained deep-learning model. It is an experimental
+          decision-support demo. Always follow IMD, CWC and local administration warnings.
+        </p>
+      </div>
+      <div class="credit-grid">
+        <div><span>River data</span><strong>Open-Meteo Flood API · GloFAS</strong></div>
+        <div><span>Weather data</span><strong>Open-Meteo · ECMWF / ERA5-Land</strong></div>
+        <div><span>Model</span><strong>PyTorch · BiLSTM + attention</strong></div>
+        <div><span>Runtime</span><strong>FastAPI · SQLite · Chart.js</strong></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>FloodGuard India <b>·</b> experimental early-warning system</span>
+    <span>Five basins. One shared horizon. <a href="/docs">API docs</a></span>
+  </footer>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

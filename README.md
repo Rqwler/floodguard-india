@@ -154,6 +154,70 @@ It covers the five-basin definitions, causal feature engineering, threshold labe
 
 ---
 
+## Push to GitHub
+
+The repository already points at `origin` (`Rqwler/floodguard-india`). From the project root:
+
+```powershell
+git add -A
+git commit -m "Add FloodGuard India application"
+git push origin main
+```
+
+The trained checkpoint `models/flood_lstm.pt` (≈650 KB) is tracked so a fresh clone deploys with inference ready. `.env`, the SQLite database, logs, cached CSVs and `.venv` stay ignored.
+
+## Deploy
+
+The project is a single FastAPI service with a bundled static frontend, so it runs anywhere Python 3.11+ or Docker runs. The trained model is committed; no build-time training is needed.
+
+### Docker (any host)
+
+```powershell
+docker build -t floodguard-india .
+docker run -d --name floodguard -p 8000:8000 -v floodguard-data:/app/data --env-file .env floodguard-india
+```
+
+Open <http://localhost:8000>. The named volume keeps subscribers, alerts and cached history across restarts. The `--env-file` is optional; without SMTP settings the app simulates email.
+
+### Render (blueprint)
+
+1. Push the repository (above).
+2. Render dashboard → **New +** → **Blueprint** → select `floodguard-india`.
+3. Render reads `render.yaml`, builds the Dockerfile and health-checks `/api/health`.
+4. Add any `SMTP_*` variables under **Environment** to enable real email. The public base URL is inferred from `RENDER_EXTERNAL_URL`.
+
+The blueprint uses the free plan: the service sleeps when idle and its disk is ephemeral, so subscribers reset after a redeploy. For persistent SQLite data, move to a paid instance and uncomment the `disk` block in `render.yaml`.
+
+### Railway
+
+1. **New Project** → **Deploy from GitHub** → select the repository; the Dockerfile is detected automatically.
+2. Add `AUTO_TRAIN=false` plus optional `SMTP_*` variables.
+3. Add a volume mounted at `/app/data` so subscribers and caches survive deploys.
+4. Generate a public domain. `APP_BASE_URL` is inferred from `RAILWAY_PUBLIC_DOMAIN`, or set it explicitly.
+
+### VPS
+
+```bash
+git clone https://github.com/Rqwler/floodguard-india.git
+cd floodguard-india
+python3 -m venv .venv && . .venv/bin/activate
+pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.3,<3.0"
+pip install -r requirements.txt
+cp .env.example .env   # edit SMTP, APP_BASE_URL and alert policy
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Put Nginx or Caddy in front for HTTPS, and run the process under systemd, `docker compose` or another supervisor.
+
+### Deployment notes
+
+- Run **one** worker. The 30-minute refresh scheduler lives inside the app; multiple workers would duplicate refresh and alert evaluation.
+- Keep `AUTO_TRAIN=false` when `models/flood_lstm.pt` is present. Automatic training is only a fallback and is slow on small instances.
+- Free hosting tiers have ephemeral disks and sleep on idle. Use a persistent volume for real subscribers.
+- The service is unauthenticated and `/api/alerts/demo` is public. Put authentication in front before using it with a real audience.
+
+---
+
 ## Email alerts
 
 Copy `.env.example` to `.env`. With no SMTP settings the app runs in **simulation mode**:
@@ -243,6 +307,8 @@ floodguard-india/
 │  └─ metadata.json    metrics, thresholds, scalers, features
 ├─ data/               git-ignored runtime data (CSV cache, SQLite, outbox)
 ├─ requirements.txt
+├─ Dockerfile          CPU-only container image for hosted deploys
+├─ render.yaml         Render blueprint (Docker, health check, free plan)
 ├─ .env.example
 ├─ run.ps1
 └─ README.md
@@ -262,7 +328,7 @@ floodguard-india/
 | `ALERT_HORIZON_DAYS` | `3` | Forecast window inspected for alerts |
 | `ALERT_COOLDOWN_HOURS` | `12` | Minimum gap between alerts per basin |
 | `HYBRID_MODEL_WEIGHT` | `0.4` | BiLSTM share of the operational score |
-| `APP_BASE_URL` | `http://localhost:8000` | Dashboard link used in emails |
+| `APP_BASE_URL` | `http://localhost:8000` | Dashboard link used in emails; auto-detected on Render/Railway |
 
 ---
 

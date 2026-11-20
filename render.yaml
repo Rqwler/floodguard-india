@@ -1,0 +1,26 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+# The trained checkpoint is committed, so AUTO_TRAIN is disabled for fast starts.
+services:
+  - type: web
+    name: floodguard-india
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: AUTO_TRAIN
+        value: "false"
+      - key: REFRESH_MINUTES
+        value: "30"
+      # APP_BASE_URL is inferred from RENDER_EXTERNAL_URL. Add SMTP_* variables
+      # in the Render dashboard (Environment) to switch email from simulation
+      # to real delivery; never commit credentials.
+      #
+      # SQLite and the CSV cache live in /app/data. The free plan uses an
+      # ephemeral disk, so subscribers reset on redeploy. Paid plans can mount
+      # a persistent disk:
+      #
+      # disk:
+      #   name: floodguard-data
+      #   mountPath: /app/data
+      #   sizeGB: 1
