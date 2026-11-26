@@ -12,6 +12,9 @@ __pycache__/
 .env.*
 !.env.example
 
+# Local distribution packages (source + model archives)
+dist/
+
 # Runtime data
 data/live/
 data/history/
